@@ -89,13 +89,11 @@ jobs:
 
       - name: Initialize repo and sync
         run: |
-         mkdir kernel_workspace && cd kernel_workspace
-         repo init -u https://github.com/OnePlusOSS/kernel_manifest.git -b refs/heads/oneplus/${{ github.event.inputs.CPU }} -m ${{ github.event.inputs.FEIL }}.xml --depth=1
-         repo sync
-         rm kernel_platform/common/android/abi_gki_protected_exports_* || echo "No protected exports!"
-         rm kernel_platform/msm-kernel/android/abi_gki_protected_exports_* || echo "No protected exports!"
-         sed -i 's/ -dirty//g' kernel_platform/common/scripts/setlocalversion
-         sed -i 's/ -dirty//g' kernel_platform/msm-kernel/scripts/setlocalversion
+          mkdir kernel_workspace && cd kernel_workspace
+          repo init -u https://github.com/OnePlusOSS/kernel_manifest.git -b refs/heads/oneplus/${{ github.event.inputs.CPU }} -m ${{ github.event.inputs.FEIL }}.xml --depth=1
+          repo sync
+          rm kernel_platform/common/android/abi_gki_protected_exports_* || echo "No protected exports!"
+          rm kernel_platform/msm-kernel/android/abi_gki_protected_exports_* || echo "No protected exports!"
       
       - name: KernelSU & SukiSU version
         if: ${{ github.event.inputs.kernelsu_variant == 'Official' || github.event.inputs.kernelsu_variant == 'SukiSU' }}
@@ -185,19 +183,33 @@ jobs:
           # Remove check_defconfig
           sed -i 's/check_defconfig//' ./common/build.config.gki
 
+      - name: Force remove -dirty suffix
+        run: |
+          cd kernel_workspace/kernel_platform
+          sed -i 's/ -dirty//g' common/scripts/setlocalversion
+          sed -i 's/ -dirty//g' msm-kernel/scripts/setlocalversion
+          sed -i 's/ -dirty//g' external/dtc/scripts/setlocalversion
+          sed -i '$i res=$(echo "$res" | sed '\''s/-dirty//g'\'')' common/scripts/setlocalversion
+          git add -A
+          git commit -m "Force remove -dirty suffix from kernel version"
+          
       - name: Add make name
         run: |
           cd kernel_workspace/kernel_platform
-          # 修改 setlocalversion（所有分支通用）
-          sed -i 's|echo "$res"|echo "${{ github.event.inputs.KERNEL_NAME }}"|' ./common/scripts/setlocalversion
-
-          # 仅在新版内核中修改 stamp.bzl（如 sm8650）
+          sed -i '$s|echo "\$res"|echo "${{ github.event.inputs.KERNEL_NAME }}"|' ./common/scripts/setlocalversion
           if [[ "${{ github.event.inputs.CPU }}" == "sm8650" ]]; then
-          sed -i "/stable_scmversion_cmd/s/-maybe-dirty//g" ./build/kernel/kleaf/impl/stamp.bzl
+            sed -i "/stable_scmversion_cmd/s/-maybe-dirty//g" ./build/kernel/kleaf/impl/stamp.bzl
           else
             echo "skip: 旧版内核无需修改 stamp.bzl"
           fi
-  
+
+      - name: Clean legacy build artifacts (旧版内核专用)
+        if: github.event.inputs.CPU != 'sm8650'  # 仅旧版内核需要清理
+        run: |
+          cd kernel_workspace/kernel_platform
+          # 清理旧版构建残留文件（如 out/ .out/）
+          rm -rf out/ .out/ || echo "无需清理"
+
       - name: Build kernel
         if: github.event.inputs.CPU == 'sm8650' 
         run: |
