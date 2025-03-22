@@ -224,10 +224,26 @@ jobs:
          
       - name: Make AnyKernel3
         run: |
-         git clone https://github.com/Kernel-SU/AnyKernel3 --depth=1
-         rm -rf ./AnyKernel3/.git
-         cp kernel_workspace/kernel_platform/out/msm-kernel-${{ github.event.inputs.CPUD }}-gki/dist/Image ./AnyKernel3/
-         cp kernel_workspace/kernel_platform/out/msm-kernel-${{ github.event.inputs.CPUD }}-gki/dist/Image ./kernel_workspace/kernel
+          git clone https://github.com/Kernel-SU/AnyKernel3 --depth=1
+          rm -rf ./AnyKernel3/.git
+
+          # 动态路径生成
+          if [[ "${{ github.event.inputs.CPU }}" == "sm8650" ]]; then
+            IMAGE_PATH="kernel_workspace/kernel_platform/out/msm-kernel-${{ github.event.inputs.CPUD }}-gki/dist/Image"
+          else
+            IMAGE_PATH="kernel_workspace/kernel_platform/out/msm-${{ github.event.inputs.CPUD }}-${{ github.event.inputs.CPUD }}-gki/dist/Image"
+          fi
+
+          # 检查文件是否存在
+          if [ -f "$IMAGE_PATH" ]; then
+            cp "$IMAGE_PATH" ./AnyKernel3/
+            cp "$IMAGE_PATH" ./kernel_workspace/kernel
+          else
+            echo "错误：内核镜像文件未生成！可能原因："
+            echo "1. 构建失败，请检查日志。"
+            echo "2. 路径错误：$IMAGE_PATH"
+            exit 1
+          fi
          
       - name: Upload AnyKernel3
         uses: actions/upload-artifact@v4
