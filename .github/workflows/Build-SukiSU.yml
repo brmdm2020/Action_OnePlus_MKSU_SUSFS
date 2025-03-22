@@ -187,9 +187,16 @@ jobs:
 
       - name: Add make name
         run: |
-         cd kernel_workspace/kernel_platform
-         sed -i '$s|echo "\$res"|echo "\${{ github.event.inputs.KERNEL_NAME }}"|' ./common/scripts/setlocalversion
-         sed -i "/stable_scmversion_cmd/s/-maybe-dirty//g" ./build/kernel/kleaf/impl/stamp.bzl
+          cd kernel_workspace/kernel_platform
+          # 修改 setlocalversion（所有分支通用）
+          sed -i 's|echo "$res"|echo "${{ github.event.inputs.KERNEL_NAME }}"|' ./common/scripts/setlocalversion
+
+          # 仅在新版内核中修改 stamp.bzl（如 sm8650）
+          if [[ "${{ github.event.inputs.CPU }}" == "sm8650" ]]; then
+          sed -i "/stable_scmversion_cmd/s/-maybe-dirty//g" ./build/kernel/kleaf/impl/stamp.bzl
+          else
+            echo "skip: 旧版内核无需修改 stamp.bzl"
+          fi
   
       - name: Build kernel
         if: github.event.inputs.CPU == 'sm8650' 
